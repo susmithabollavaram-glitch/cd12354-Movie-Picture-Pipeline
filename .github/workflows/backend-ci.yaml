@@ -30,7 +30,7 @@ jobs:
         run: pip install pipenv
 
       - name: Install dependencies
-        run: pipenv install
+        run: pipenv install --dev
 
       - name: Run lint
         run: pipenv run lint
@@ -67,10 +67,24 @@ jobs:
       - lint
       - test
 
+    defaults:
+      run:
+        working-directory: starter/backend
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10.6'
+
+      - name: Install Pipenv
+        run: pip install pipenv
+
+      - name: Install dependencies
+        run: pipenv install --dev
+
       - name: Build backend Docker image
-        working-directory: starter/backend
         run: docker build -t movie-picture-backend:latest .
