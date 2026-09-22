@@ -18,6 +18,7 @@ env:
   IMAGE_TAG: ${{ github.sha }}
 
 jobs:
+
   lint:
     runs-on: ubuntu-latest
 
@@ -42,6 +43,7 @@ jobs:
 
       - name: Run lint
         run: pipenv run lint
+
 
   test:
     runs-on: ubuntu-latest
@@ -68,6 +70,7 @@ jobs:
       - name: Run tests
         run: pipenv run test
 
+
   deploy:
     runs-on: ubuntu-latest
 
@@ -79,8 +82,10 @@ jobs:
       contents: read
 
     steps:
+
       - name: Checkout code
         uses: actions/checkout@v4
+
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -89,9 +94,11 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
+
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
+
 
       - name: Build backend Docker image
         working-directory: starter/backend
@@ -103,6 +110,7 @@ jobs:
             -t "$ECR_REGISTRY/$ECR_REPOSITORY:latest" \
             .
 
+
       - name: Push backend image to ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
@@ -110,15 +118,18 @@ jobs:
           docker push "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
           docker push "$ECR_REGISTRY/$ECR_REPOSITORY:latest"
 
+
       - name: Configure kubectl for EKS
         run: |
           aws eks update-kubeconfig \
             --region "$AWS_REGION" \
             --name "$EKS_CLUSTER_NAME"
 
+
       - name: Apply backend Kubernetes configuration
         run: |
           kubectl apply -k starter/backend/k8s/
+
 
       - name: Update backend deployment image
         env:
@@ -126,6 +137,7 @@ jobs:
         run: |
           kubectl set image deployment/backend \
             backend="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+
 
       - name: Verify backend deployment
         run: |
