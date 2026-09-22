@@ -1,18 +1,14 @@
-```yaml
 name: Backend Continuous Deployment
 
 on:
   push:
     branches:
       - main
-    paths:
-      - 'starter/backend/**'
-      - '.github/workflows/backend-cd.yaml'
   workflow_dispatch:
 
 env:
-  AWS_REGION: 'us-east-1'
-  ECR_REPOSITORY: 'backend'
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: backend
   EKS_CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
   IMAGE_TAG: ${{ github.sha }}
 
@@ -22,15 +18,12 @@ jobs:
     defaults:
       run:
         working-directory: starter/backend
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: "3.10"
 
       - name: Install dependencies
         run: |
@@ -38,7 +31,7 @@ jobs:
           pip install pipenv
           pipenv install --dev
 
-      - name: Run lint
+      - name: Lint
         run: pipenv run lint
 
   test:
@@ -46,15 +39,12 @@ jobs:
     defaults:
       run:
         working-directory: starter/backend
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: "3.10"
 
       - name: Install dependencies
         run: |
@@ -62,7 +52,7 @@ jobs:
           pip install pipenv
           pipenv install --dev
 
-      - name: Run tests
+      - name: Test
         run: pipenv run test
 
   deploy:
@@ -75,50 +65,48 @@ jobs:
       contents: read
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: 'us-east-1'
+          aws-region: us-east-1
 
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build backend Docker image
+      - name: Build Docker image
         working-directory: starter/backend
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
           docker build -t "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" .
-          docker build -t "$ECR_REGISTRY/$ECR_REPOSITORY:latest" .
+          docker tag "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" "$ECR_REGISTRY/$ECR_REPOSITORY:latest"
 
-      - name: Push backend image to ECR
+      - name: Push Docker image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
           docker push "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
           docker push "$ECR_REGISTRY/$ECR_REPOSITORY:latest"
 
-      - name: Configure kubectl for EKS
+      - name: Configure kubectl
         run: |
-          aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
+          aws eks update-kubeconfig --region us-east-1 --name "$EKS_CLUSTER_NAME"
 
-      - name: Apply backend Kubernetes configuration
+      - name: Deploy backend
         run: |
           kubectl apply -k starter/backend/k8s/
 
-      - name: Update backend deployment image
+      - name: Update backend image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
           kubectl set image deployment/backend backend="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
 
-      - name: Verify backend deployment
+      - name: Verify deployment
         run: |
           kubectl rollout status deployment/backend --timeout=180s
-```
